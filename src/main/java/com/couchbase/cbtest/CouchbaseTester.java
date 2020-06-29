@@ -3,7 +3,9 @@ package com.couchbase.cbtest;
 import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.Date;
+import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.logging.Logger;
 
@@ -11,6 +13,7 @@ import com.couchbase.client.core.deps.io.netty.handler.ssl.util.InsecureTrustMan
 import com.couchbase.client.core.diagnostics.PingResult;
 import com.couchbase.client.core.env.IoConfig;
 import com.couchbase.client.core.env.SecurityConfig;
+import com.couchbase.client.core.error.BucketNotFoundException;
 import com.couchbase.client.core.error.CollectionExistsException;
 import com.couchbase.client.core.error.CollectionNotFoundException;
 import com.couchbase.client.core.error.DocumentNotFoundException;
@@ -19,10 +22,17 @@ import com.couchbase.client.java.Cluster;
 import com.couchbase.client.java.ClusterOptions;
 import com.couchbase.client.java.Collection;
 import com.couchbase.client.java.Scope;
+import com.couchbase.client.java.analytics.*;
 import com.couchbase.client.java.env.ClusterEnvironment;
 import com.couchbase.client.java.json.JsonObject;
 import com.couchbase.client.java.kv.GetResult;
 import com.couchbase.client.java.kv.MutationResult;
+import com.couchbase.client.java.manager.bucket.BucketManager;
+import com.couchbase.client.java.manager.bucket.BucketSettings;
+import com.couchbase.client.java.manager.bucket.BucketType;
+import com.couchbase.client.java.manager.bucket.CompressionMode;
+import com.couchbase.client.java.manager.bucket.ConflictResolutionType;
+import com.couchbase.client.java.manager.bucket.EjectionPolicy;
 import com.couchbase.client.java.manager.collection.AsyncCollectionManager;
 import com.couchbase.client.java.manager.collection.CollectionManager;
 import com.couchbase.client.java.manager.collection.CollectionSpec;
@@ -85,6 +95,7 @@ public class CouchbaseTester
     public CouchbaseTester(Properties props) {
     	this.settings = props;
     }
+    
     public Cluster connectCluster(Properties props) {
     	String url = props.getProperty("url", "localhost");
     	String user = props.getProperty("user","Administrator");
@@ -110,14 +121,138 @@ public class CouchbaseTester
     	
     }
     
-    public boolean createBuckets(Properties props) {
-    	boolean status = true;
-    	String name = props.getProperty("bucket","default");
-    	int count = Integer.parseInt(props.getProperty("bucket.count","1"));
-    	    	
-    	print("Creating buckets "+ name + ", count="+count);
+    public Cluster connectClusterOnly(Properties props) {
+    	String url = props.getProperty("url", "localhost");
+    	String user = props.getProperty("user","Administrator");
+    	String pwd = props.getProperty("password", "password");
+    	String bucketName = props.getProperty("bucket","default");
+    	boolean isdbaas = Boolean.parseBoolean(props.getProperty("dbaas", "false"));
     	
-    	return status;
+    	ClusterEnvironment env = ClusterEnvironment.builder()
+    		       .ioConfig(IoConfig.enableDnsSrv(isdbaas))
+    		       .securityConfig(SecurityConfig.enableTls(isdbaas)
+    		               .trustManagerFactory(InsecureTrustManagerFactory.INSTANCE))
+    		       .build();
+    	print("Connecting to cluster");
+		cluster = Cluster.connect(url, 
+				ClusterOptions.clusterOptions(user, pwd).environment(env));
+		
+		print("Connected to cluster");
+	
+		return cluster;
+    	
+    }
+       
+    
+    public void createBuckets(Properties props) {
+    	boolean status = true;
+    	int bucketCount = Integer.parseInt(props.getProperty("bucket.count","1"));
+    	int bucketStart = Integer.parseInt(props.getProperty("bucket.start","1"));
+    	String bucketName = props.getProperty("bucket","default");
+    	String bucketType = props.getProperty("bucket.type","couchbase");
+    	long ramQuotaMB = Long.parseLong(props.getProperty("bucket.quota","100"));
+    	int numReplicas = Integer.parseInt(props.getProperty("bucket.replicas","1"));
+    	int maxTTL = Integer.parseInt(props.getProperty("bucket.maxTTL","0"));
+    	boolean replicaIndex = Boolean.parseBoolean(props.getProperty("bucket.replicaindex","true"));
+    	String operation = props.getProperty("operation","create");
+    	
+    	BucketManager manager = cluster.buckets();
+    	BucketSettings bucketSettings = null;
+    	if (bucketCount==1) {
+    		print(operation+" bucket "+ bucketName);
+    		
+    		switch (operation) {
+	    		case "create":
+	       		 	bucketSettings = BucketSettings.create(bucketName)
+	   	    			.bucketType(BucketType.COUCHBASE)
+	   	    			.ramQuotaMB(ramQuotaMB)
+	   			    	.numReplicas(numReplicas)
+	   			    	.maxTTL(maxTTL)
+	   			    	.replicaIndexes(replicaIndex)
+	   			    	.conflictResolutionType(ConflictResolutionType.TIMESTAMP)
+	   			    	.ejectionPolicy(EjectionPolicy.FULL);
+	     	    	manager.createBucket(bucketSettings);
+	    			break;
+	    		case "drop":	
+	    			manager.dropBucket(bucketName);
+	    			break;
+	    		case "dropall":
+	    			Map<String, BucketSettings> buckets = manager.getAllBuckets();
+	    			int totalBuckets = buckets.size();
+	    			Set<String> bucketNames = buckets.keySet();
+	    			for (String bKey: bucketNames) {
+	    				print("Droping..."+buckets.get(bKey).toString());
+	    				BucketSettings b = (BucketSettings)buckets.get(bKey);
+	    				manager.dropBucket(b.name());
+	    			}
+	        	    break;    
+	    			
+	    		default:
+	    			bucketSettings = BucketSettings.create(bucketName)
+   	    			.bucketType(BucketType.COUCHBASE)
+   	    			.ramQuotaMB(ramQuotaMB)
+   			    	.numReplicas(numReplicas)
+   			    	.maxTTL(maxTTL)
+   			    	.replicaIndexes(replicaIndex)
+   			    	.conflictResolutionType(ConflictResolutionType.TIMESTAMP)
+   			    	.ejectionPolicy(EjectionPolicy.FULL);
+	    			manager.createBucket(bucketSettings);
+	    			break;
+	    			
+			}
+    		
+	    	//manager.updateBucket(bucketSettings);
+	    	//clusterManager.removeBucket("new_bucket");
+	    	
+    	} else {
+	    	print(operation+" buckets "+ bucketName + "_xxx, count="+bucketCount);
+	    	String bName = null;
+	    	for (int bucketIndex=1; bucketIndex<=bucketCount+bucketStart; bucketIndex++) {
+	    		bName = bucketName+"_"+bucketIndex;
+	    		switch (operation) {
+		    		case "create":
+		    			 bucketSettings = BucketSettings.create(bName)
+			    			.bucketType(BucketType.COUCHBASE)
+			    			.ramQuotaMB(ramQuotaMB)
+					    	.numReplicas(numReplicas)
+					    	.maxTTL(maxTTL)
+					    	.replicaIndexes(replicaIndex)
+					    	.conflictResolutionType(ConflictResolutionType.TIMESTAMP)
+					    	.ejectionPolicy(EjectionPolicy.FULL);
+		    			 manager.createBucket(bucketSettings);
+		    			break;
+		    		case "drop":
+		    			
+		    			manager.dropBucket(bName);
+		    			break;
+		    		case "dropall":
+		    			Map<String, BucketSettings> buckets = manager.getAllBuckets();
+		    			int totalBuckets = buckets.size();
+		    			Set<String> bucketNames = buckets.keySet();
+		    			for (String bKey: bucketNames) {
+		    				print("Droping..."+buckets.get(bKey).toString());
+		    				BucketSettings b = (BucketSettings)buckets.get(bKey);
+		    				manager.dropBucket(b.name());
+		    			}
+		        	    return;    
+		    			
+		    		default:
+		    			bucketSettings = BucketSettings.create(bName)
+	   	    			.bucketType(BucketType.COUCHBASE)
+	   	    			.ramQuotaMB(ramQuotaMB)
+	   			    	.numReplicas(numReplicas)
+	   			    	.maxTTL(maxTTL)
+	   			    	.replicaIndexes(replicaIndex)
+	   			    	.conflictResolutionType(ConflictResolutionType.TIMESTAMP)
+	   			    	.ejectionPolicy(EjectionPolicy.FULL);
+		    			manager.createBucket(bucketSettings);
+		    			break;
+		    			
+				}
+	    			 		    	
+	    	}
+    	}
+    	
     }
 
     public void createScopes(Properties props) {
@@ -352,18 +487,37 @@ public class CouchbaseTester
     	String bucketName = props.getProperty("bucket","default");
     	String scopeName = props.getProperty("scope","_default");
     	
-        Bucket bucket = cluster.bucket(bucketName);
-        Collection collection = null;
-        CollectionManager cm = bucket.collections();
-        int sindex=0, cindex=0;
-        for (ScopeSpec s: cm.getAllScopes()) {
-        	sindex++;
-        	for (CollectionSpec cs: s.collections()) {
-        		print(bucket.name()+"."+s.name()+"."+cs.name());
-        		cindex++;
+        
+        BucketManager manager = cluster.buckets();
+        Map<String, BucketSettings> buckets = manager.getAllBuckets();
+        int totalBuckets = buckets.size();
+        int totalScopes = 0, totalCollections=0;
+        for (String key: buckets.keySet()) {
+        	BucketSettings b = (BucketSettings) buckets.get(key);
+        	bucketName = b.name();
+        	Bucket bucket = null;
+        	try {
+        		 bucket = cluster.bucket(bucketName);
+        	} catch (BucketNotFoundException bnfe) {
+        		print(bucketName +" is not yet live!");
         	}
+	        	
+	        Collection collection = null;
+	        CollectionManager cm = bucket.collections();
+	        int sindex=0, cindex=0;
+	        for (ScopeSpec s: cm.getAllScopes()) {
+	        	sindex++;
+	        	for (CollectionSpec cs: s.collections()) {
+	        		print(bucket.name()+"."+s.name()+"."+cs.name());
+	        		cindex++;
+	        	}
+	        }
+	        print("Bucket:"+bucketName+"--> Scopes: "+sindex+", Collections: "+cindex);
+	        totalScopes+=sindex;
+	        totalCollections+=cindex;
         }
-        print("Scopes: "+sindex+", Collections: "+cindex);
+        print("Total buckets="+totalBuckets+", Total Scopes="+totalScopes+", Total Collections="+totalCollections);
+        
         
     }
     
@@ -532,6 +686,17 @@ public class CouchbaseTester
         }
         
        
+    }
+    
+    public void runAnalytics(Properties props) {
+    	/*AnalyticsResult result = bucket.query(AnalyticsAccessor.simple(
+    		    "SELECT airportname, country FROM airports WHERE country = 'France' LIMIT 5"
+    		));
+    		if (result.finalSuccess()) {
+    		    for (AnalyticsQueryRow row : result) {
+    		        System.out.println(row.value());
+    		    }
+    		}*/
     }
 
     public void qryGreeting(Properties props) {
