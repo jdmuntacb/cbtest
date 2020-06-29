@@ -172,6 +172,7 @@ public class CouchbaseTester
 	   			    	.conflictResolutionType(ConflictResolutionType.TIMESTAMP)
 	   			    	.ejectionPolicy(EjectionPolicy.FULL);
 	     	    	manager.createBucket(bucketSettings);
+	     	    	
 	    			break;
 	    		case "drop":	
 	    			manager.dropBucket(bucketName);
@@ -253,6 +254,14 @@ public class CouchbaseTester
 	    	}
     	}
     	
+    }
+    
+    public void openBucket(Properties props) {
+    	String bucketName = props.getProperty("bucket","default");
+    	bucket = cluster.bucket(bucketName);
+		bucket.waitUntilReady(Duration.parse("PT10S"));
+		print("Connected to cluster");
+		Collection collection = bucket.defaultCollection();
     }
 
     public void createScopes(Properties props) {
@@ -510,6 +519,7 @@ public class CouchbaseTester
 	        	for (CollectionSpec cs: s.collections()) {
 	        		print(bucket.name()+"."+s.name()+"."+cs.name());
 	        		cindex++;
+	        		
 	        	}
 	        }
 	        print("Bucket:"+bucketName+"--> Scopes: "+sindex+", Collections: "+cindex);
@@ -699,6 +709,17 @@ public class CouchbaseTester
     		}*/
     }
 
+    public void cycle(Properties props) {
+    	connectClusterOnly(props);
+    	createBuckets(props);
+    	delay(props);
+    	openBucket(props);
+    	createScopes(props);
+    	createCollections(props);
+    	listCollections(props);
+    	createTenantDocs(props);
+    }
+    
     public void qryGreeting(Properties props) {
     	 QueryResult result = cluster.query("select \"Hello World\" as greeting");
          print(result.rowsAsObject().toString());
@@ -707,6 +728,16 @@ public class CouchbaseTester
     public void pingCluster(Properties props) {
     	PingResult ping = cluster.ping();
 		print(ping.toString());
+    }
+    
+    public void delay(Properties props) {
+    	long seconds = Long.parseLong(props.getProperty("delay","10"));
+    	try {
+    		print("Sleeping for "+seconds+" secs.");
+			Thread.sleep(seconds*1000);
+		} catch (InterruptedException e) {
+			print(e.getMessage());
+		}
     }
     
     public static void print(String s) {
