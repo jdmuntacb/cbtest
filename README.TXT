@@ -26,5 +26,14 @@ $ java -Durl=172.23.136.109 -Duser=Administrator -Dpassword=password -Drun=conne
 To create 1000 documents in each of 100 tenants (tenant_1,tenant_2..tenant_100) in each of 10 scopes (project_1,..project_10) of bucket (db):
 $ java -Durl=172.23.136.109 -Duser=Administrator -Dpassword=password -Drun=connectCluster,createTenantDocs -Dbucket=db -Dscope=project -Dscope.count=10 -Ddoc.count=1000 -Dcollection=tenant -Dcollection.count=100 -Doperation=create -jar target/cbtest-0.0.1-SNAPSHOT-jar-with-dependencies.jar
 
-To delete, use the below in the above commands. To drop all collections, use -Doperation=dropall
+To create a cycle with 1 bucket with 200MB quota, 10 scopes/bucket, 100 tenants/scope, 1 document/tenant:
+$ java -Durl=172.23.136.130 -Duser=Administrator -Dpassword=password -Drun=cycle -Dbucket=db_1 -Dscope="project" -Dscope.count=10 -Dcollection=tenant -Dcollection.count=100 -Ddoc.count=1 -Dbucket.quota=200 -jar target/cbtest-0.0.1-SNAPSHOT-jar-with-dependencies.jar
+
+
+cycle == connectClusterOnly,createBuckets,delay,openBucket,createScopes,createCollections,listCollections,createTenantDocs
+
+To delete, use the below in the above commands. To drop all buckets or collections, use -Doperation=dropall
 -Doperation=drop
+
+Cloud instance:
+$ java -Durl=d6965adb-6174-4a45-91e7-866f4bf9b408.dataplane.nonprod-project-avengers.com -Ddbaas=true -Duser=dbtestuser -Dpassword=password -Drun=connectCluster,pingCluster,qryGreeting,createDocs -Dbucket=couchbasecloudbucket -jar target/cbtest-0.0.1-SNAPSHOT-jar-with-dependencies.jar
