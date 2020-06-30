@@ -28,9 +28,11 @@ $ java -Durl=172.23.136.109 -Duser=Administrator -Dpassword=password -Drun=conne
 
 To create a cycle with 1 bucket with 200MB quota, 10 scopes/bucket, 100 tenants/scope, 1 document/tenant:
 $ java -Durl=172.23.136.130 -Duser=Administrator -Dpassword=password -Drun=cycle -Dbucket=db_1 -Dscope="project" -Dscope.count=10 -Dcollection=tenant -Dcollection.count=100 -Ddoc.count=1 -Dbucket.quota=200 -jar target/cbtest-0.0.1-SNAPSHOT-jar-with-dependencies.jar
+where cycle == connectClusterOnly,createBuckets,delay,openBucket,createScopes,createCollections,listCollections,createTenantDocs
 
-
-cycle == connectClusterOnly,createBuckets,delay,openBucket,createScopes,createCollections,listCollections,createTenantDocs
+To run queries:
+$ java -Durl=172.23.136.130 -Duser=Administrator -Dpassword=password -Drun=connectClusterOnly,query,analytics  -jar target/cbtest-0.0.1-SNAPSHOT-jar-with-dependencies.jar 
+$ java -Durl=172.23.136.130 -Duser=Administrator -Dpassword=password -Drun=connectClusterOnly,query,analytics  -Dquery='SELECT * FROM Metadata.`Dataverse`' -jar target/cbtest-0.0.1-SNAPSHOT-jar-with-dependencies.jar
 
 To delete, use the below in the above commands. To drop all buckets or collections, use -Doperation=dropall
 -Doperation=drop
