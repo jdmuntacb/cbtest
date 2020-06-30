@@ -16,7 +16,9 @@ import com.couchbase.client.core.env.SecurityConfig;
 import com.couchbase.client.core.error.BucketNotFoundException;
 import com.couchbase.client.core.error.CollectionExistsException;
 import com.couchbase.client.core.error.CollectionNotFoundException;
+import com.couchbase.client.core.error.CouchbaseException;
 import com.couchbase.client.core.error.DocumentNotFoundException;
+import com.couchbase.client.core.error.ParsingFailureException;
 import com.couchbase.client.java.Bucket;
 import com.couchbase.client.java.Cluster;
 import com.couchbase.client.java.ClusterOptions;
@@ -698,15 +700,23 @@ public class CouchbaseTester
        
     }
     
-    public void runAnalytics(Properties props) {
-    	/*AnalyticsResult result = bucket.query(AnalyticsAccessor.simple(
-    		    "SELECT airportname, country FROM airports WHERE country = 'France' LIMIT 5"
-    		));
-    		if (result.finalSuccess()) {
-    		    for (AnalyticsQueryRow row : result) {
-    		        System.out.println(row.value());
-    		    }
-    		}*/
+    public void analytics(Properties props) {
+    	String query = props.getProperty("query","select \"hello\" as greeting");
+    	try {
+    		print("Running Analytics Query: "+query);
+    		final AnalyticsResult result = cluster.analyticsQuery(query);
+	
+			for (JsonObject row : result.rowsAsObject()) {
+			    print("Found row: " + row);
+			}
+	
+			  print("Reported execution time: " + result.metaData().metrics().executionTime());
+		} catch (ParsingFailureException pfe) {
+			print("Failed: " + pfe.getMessage());
+		} catch (CouchbaseException ex) {
+			print("Failed: " + ex.getMessage());
+		}
+    	
     }
 
     public void cycle(Properties props) {
@@ -720,9 +730,16 @@ public class CouchbaseTester
     	createTenantDocs(props);
     }
     
-    public void qryGreeting(Properties props) {
-    	 QueryResult result = cluster.query("select \"Hello World\" as greeting");
-         print(result.rowsAsObject().toString());
+    public void query(Properties props) {
+    	//create primary index index1 on default:`db_1`.`project_1`.`tenant_1`;
+    	String query = props.getProperty("query","select \"hello\" as greeting");
+    	print("Running query: "+query);
+    	try {
+	    	QueryResult result = cluster.query(query);
+	        print(result.rowsAsObject().toString());
+    	} catch (Exception e) {
+			print("Failed: " + e.getMessage());
+		}
     }
     
     public void pingCluster(Properties props) {
