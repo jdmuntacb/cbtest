@@ -39,6 +39,7 @@ import com.couchbase.client.java.manager.collection.AsyncCollectionManager;
 import com.couchbase.client.java.manager.collection.CollectionManager;
 import com.couchbase.client.java.manager.collection.CollectionSpec;
 import com.couchbase.client.java.manager.collection.ScopeSpec;
+import com.couchbase.client.java.manager.query.CreatePrimaryQueryIndexOptions;
 import com.couchbase.client.java.query.QueryResult;
 
 
@@ -265,6 +266,12 @@ public class CouchbaseTester
 		print("Connected to cluster");
 		Collection collection = bucket.defaultCollection();
     }
+    
+    public void createPrimaryIndex(Properties props) {
+    	String bucketName = props.getProperty("bucket","default");
+		cluster.queryIndexes().createPrimaryIndex(bucketName, CreatePrimaryQueryIndexOptions.createPrimaryQueryIndexOptions().ignoreIfExists(true));
+    }
+    
 
     public void createScopes(Properties props) {
     	boolean status = true;
