@@ -766,11 +766,58 @@ public class CouchbaseTester
        
     }
     
+    public void query(Properties props) {
+    	//create primary index index1 on default:`db_1`.`project_1`.`tenant_1`;
+    	String query = props.getProperty("query","select \"hello\" as greeting");
+    	String file = props.getProperty("file",null);
+    	boolean isDebug = Boolean.parseBoolean(props.getProperty("isDebug","true"));
+    	if (file!=null) {
+    		print("Running queries from file: "+file);
+    		try {
+				BufferedReader reader = new BufferedReader(new FileReader(new File(file)));
+				while ((query=reader.readLine())!=null) {
+					if (query.startsWith("#")) {
+						continue;
+					}
+					try {
+			    		print("Running Query: "+query);
+			    		QueryResult result = cluster.query(query);
+			    		print(result.rowsAsObject().toString());
+					} catch (Exception e) {
+						print("Failed: " + e.getMessage());
+						if (isDebug) {
+							e.printStackTrace();
+						}
+					}
+				}
+		    	
+			} catch (IOException e) {
+				print("Failed: " + e.getMessage());
+				if (isDebug) {
+					e.printStackTrace();
+				}
+			}
+    	} else {
+	    	try {
+	    		print("Running Query: "+query);
+	    		QueryResult result = cluster.query(query);
+		        print(result.rowsAsObject().toString());
+			} catch (Exception e) {
+				print("Failed: " + e.getMessage());
+				if (isDebug) {
+					e.printStackTrace();
+				}
+			}
+    	}
+    }
+    
+    
     public void analytics(Properties props) {
     	String query = props.getProperty("query","select \"hello\" as greeting");
     	String file = props.getProperty("file",null);
     	boolean isDebug = Boolean.parseBoolean(props.getProperty("isDebug","true"));
     	if (file!=null) {
+    		print("Running analytics queries from file: "+file);
     		try {
 				BufferedReader reader = new BufferedReader(new FileReader(new File(file)));
 				while ((query=reader.readLine())!=null) {
@@ -780,8 +827,7 @@ public class CouchbaseTester
 					try {
 			    		print("Running Analytics Query: "+query);
 			    		final AnalyticsResult result = cluster.analyticsQuery(query);
-				
-						for (JsonObject row : result.rowsAsObject()) {
+			    		for (JsonObject row : result.rowsAsObject()) {
 						    print("Found row: " + row);
 						}
 				
@@ -791,11 +837,7 @@ public class CouchbaseTester
 						if (isDebug) {
 							e.printStackTrace();
 						}
-					} /*catch (ParsingFailureException pfe) {
-						print("Failed: " + pfe.getMessage());
-					} catch (CouchbaseException ex) {
-						print("Failed: " + ex.getMessage());
-					}*/
+					}
 				}
 		    	
 			} catch (IOException e) {
@@ -819,11 +861,7 @@ public class CouchbaseTester
 				if (isDebug) {
 					e.printStackTrace();
 				}
-			} /*catch (ParsingFailureException pfe) {
-				print("Failed: " + pfe.getMessage());
-			} catch (CouchbaseException ex) {
-				print("Failed: " + ex.getMessage());
-			}*/
+			}
     	}
     	
     	
@@ -846,18 +884,6 @@ public class CouchbaseTester
     	}
     }
     
-    public void query(Properties props) {
-    	//create primary index index1 on default:`db_1`.`project_1`.`tenant_1`;
-    	String query = props.getProperty("query","select \"hello\" as greeting");
-    	print("Running query: "+query);
-    	try {
-	    	QueryResult result = cluster.query(query);
-	        print(result.rowsAsObject().toString());
-    	} catch (Exception e) {
-			print("Failed: " + e.getMessage());
-			e.printStackTrace();
-		}
-    }
     
     public void pingCluster(Properties props) {
     	PingResult ping = cluster.ping();
