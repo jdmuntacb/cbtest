@@ -1,5 +1,10 @@
 package com.couchbase.cbtest;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.Date;
@@ -158,6 +163,7 @@ public class CouchbaseTester
     	int maxTTL = Integer.parseInt(props.getProperty("bucket.maxTTL","0"));
     	boolean replicaIndex = Boolean.parseBoolean(props.getProperty("bucket.replicaindex","true"));
     	String operation = props.getProperty("operation","create");
+    	boolean isCreatePrimaryIndex = Boolean.parseBoolean(props.getProperty("isCreatePrimaryIndex","true"));
     	
     	BucketManager manager = cluster.buckets();
     	BucketSettings bucketSettings = null;
@@ -175,7 +181,10 @@ public class CouchbaseTester
 	   			    	.conflictResolutionType(ConflictResolutionType.TIMESTAMP)
 	   			    	.ejectionPolicy(EjectionPolicy.FULL);
 	     	    	manager.createBucket(bucketSettings);
-	     	    	
+	     	    	if (isCreatePrimaryIndex) {
+	    				props.setProperty("query", "CREATE PRIMARY INDEX ON `"+bucketName+"`" );
+	    				query(props);
+	    			}
 	    			break;
 	    		case "drop":	
 	    			manager.dropBucket(bucketName);
@@ -201,6 +210,10 @@ public class CouchbaseTester
    			    	.conflictResolutionType(ConflictResolutionType.TIMESTAMP)
    			    	.ejectionPolicy(EjectionPolicy.FULL);
 	    			manager.createBucket(bucketSettings);
+	    			if (isCreatePrimaryIndex) {
+	    				props.setProperty("query", "CREATE PRIMARY INDEX ON `"+bucketName+"`" );
+	    				query(props);
+	    			}
 	    			break;
 	    			
 			}
@@ -224,6 +237,10 @@ public class CouchbaseTester
 					    	.conflictResolutionType(ConflictResolutionType.TIMESTAMP)
 					    	.ejectionPolicy(EjectionPolicy.FULL);
 		    			 manager.createBucket(bucketSettings);
+		    			 if (isCreatePrimaryIndex) {
+			    				props.setProperty("query", "CREATE PRIMARY INDEX ON `"+bucketName+"`" );
+			    				query(props);
+			    		 }
 		    			break;
 		    		case "drop":
 		    			
@@ -250,6 +267,10 @@ public class CouchbaseTester
 	   			    	.conflictResolutionType(ConflictResolutionType.TIMESTAMP)
 	   			    	.ejectionPolicy(EjectionPolicy.FULL);
 		    			manager.createBucket(bucketSettings);
+		    			if (isCreatePrimaryIndex) {
+		    				props.setProperty("query", "CREATE PRIMARY INDEX ON `"+bucketName+"`" );
+		    				query(props);
+		    			}
 		    			break;
 		    			
 				}
@@ -345,6 +366,7 @@ public class CouchbaseTester
     	int collectionStart = Integer.parseInt(props.getProperty("collection.start","1"));
     	long secsExp = Long.parseLong(props.getProperty("maxExpiry","-1"));
     	String operation = props.getProperty("operation","create");
+    	boolean isCreatePrimaryIndex = Boolean.parseBoolean(props.getProperty("isCreatePrimaryIndex","true"));
     	
     	Duration maxExpiry = null;
     	if (secsExp!=-1) {
@@ -371,6 +393,21 @@ public class CouchbaseTester
 		    				bucket.defaultCollection();
 		    			}
 		    			cm.createCollection(collectionSpec);
+		    			// TBD: below API is not working.
+		    			//cluster.queryIndexes().createPrimaryIndex(bucket.name()+"."+scope.name()+"."+collectionName, 
+		    			//	    CreatePrimaryQueryIndexOptions.createPrimaryQueryIndexOptions().ignoreIfExists(true));
+		    			if (isCreatePrimaryIndex) {
+		    				props.setProperty("query", "CREATE PRIMARY INDEX ON `"+bucket.name()+"`.`"+scope.name()+"`.`"+collectionName+"`" );
+		    				query(props);
+		    			}
+		    			
+		    			//cluster.queryIndexes().createPrimaryIndex("`"+bucket.name()+"`.`"+scope.name()+"`.`"+collectionName+"`", 
+		    			//		CreatePrimaryQueryIndexOptions.createPrimaryQueryIndexOptions().ignoreIfExists(true));
+		    			//cluster.queryIndexes().createPrimaryIndex("default:"+bucket.name()+"."+scope.name()+"."+collectionName, 
+		    			//	    CreatePrimaryQueryIndexOptions.createPrimaryQueryIndexOptions().ignoreIfExists(true));
+		    			//cluster.queryIndexes().createPrimaryIndex("default:`"+bucket.name()+"`.`"+scope.name()+"`.`"+collectionName+"`", 
+		    			//		CreatePrimaryQueryIndexOptions.createPrimaryQueryIndexOptions().ignoreIfExists(true));
+		    					
 		    			break;
 		    		case "drop":	
 		    			try {
@@ -427,6 +464,10 @@ public class CouchbaseTester
 			    		switch (operation) {
 				    		case "create":
 				    			cm.createCollection(collectionSpec);
+				    			if (isCreatePrimaryIndex) {
+				    				props.setProperty("query", "CREATE PRIMARY INDEX ON `"+bucket.name()+"`.`"+scope.name()+"`.`"+collectionName+"`" );
+				    				query(props);
+				    			}
 				    			break;
 				    		case "drop":	
 				    			try {
@@ -437,6 +478,10 @@ public class CouchbaseTester
 				    			break;
 				    		default:
 				    			cm.createCollection(collectionSpec);
+				    			if (isCreatePrimaryIndex) {
+				    				props.setProperty("query", "CREATE PRIMARY INDEX ON `"+bucket.name()+"`.`"+scope.name()+"`.`"+collectionName+"`" );
+				    				query(props);
+				    			}
 			    		}
 			    	}catch (CollectionExistsException cee) {
 			    		print(cee.getMessage());
@@ -476,6 +521,10 @@ public class CouchbaseTester
 				    		switch (operation) {
 					    		case "create":
 					    			cm.createCollection(collectionSpec);
+					    			if (isCreatePrimaryIndex) {
+					    				props.setProperty("query", "CREATE PRIMARY INDEX ON `"+bucket.name()+"`.`"+sName+"`.`"+cName+"`" );
+					    				query(props);
+					    			}
 					    			break;
 					    		case "drop":	
 					    			try {
@@ -487,6 +536,10 @@ public class CouchbaseTester
 					    		
 					    		default:
 					    			cm.createCollection(collectionSpec);
+					    			if (isCreatePrimaryIndex) {
+					    				props.setProperty("query", "CREATE PRIMARY INDEX ON `"+bucket.name()+"`.`"+sName+"`.`"+cName+"`" );
+					    				query(props);
+					    			}
 					    			break;
 				    		}
 				    		
@@ -618,7 +671,13 @@ public class CouchbaseTester
 	            GetResult getResult = null;
 	            switch (operation) {
 		    		case "create":
-		    			result = collection.upsert( docKey, json);
+		    			try {
+		    				result = collection.upsert( docKey, json);
+		    			} catch (com.couchbase.client.core.error.AmbiguousTimeoutException ate) {
+		    				print("Retrying due to ..."+ate.getMessage());
+		    				result = collection.upsert( docKey, json);
+		    			}
+		    			
 			            getResult = collection.get(docKey);
 			            print(getResult.toString());
 			            break;
@@ -709,20 +768,64 @@ public class CouchbaseTester
     
     public void analytics(Properties props) {
     	String query = props.getProperty("query","select \"hello\" as greeting");
-    	try {
-    		print("Running Analytics Query: "+query);
-    		final AnalyticsResult result = cluster.analyticsQuery(query);
-	
-			for (JsonObject row : result.rowsAsObject()) {
-			    print("Found row: " + row);
+    	String file = props.getProperty("file",null);
+    	boolean isDebug = Boolean.parseBoolean(props.getProperty("isDebug","true"));
+    	if (file!=null) {
+    		try {
+				BufferedReader reader = new BufferedReader(new FileReader(new File(file)));
+				while ((query=reader.readLine())!=null) {
+					if (query.startsWith("#")) {
+						continue;
+					}
+					try {
+			    		print("Running Analytics Query: "+query);
+			    		final AnalyticsResult result = cluster.analyticsQuery(query);
+				
+						for (JsonObject row : result.rowsAsObject()) {
+						    print("Found row: " + row);
+						}
+				
+						  print("Reported execution time: " + result.metaData().metrics().executionTime());
+					} catch (Exception e) {
+						print("Failed: " + e.getMessage());
+						if (isDebug) {
+							e.printStackTrace();
+						}
+					} /*catch (ParsingFailureException pfe) {
+						print("Failed: " + pfe.getMessage());
+					} catch (CouchbaseException ex) {
+						print("Failed: " + ex.getMessage());
+					}*/
+				}
+		    	
+			} catch (IOException e) {
+				print("Failed: " + e.getMessage());
+				if (isDebug) {
+					e.printStackTrace();
+				}
 			}
-	
-			  print("Reported execution time: " + result.metaData().metrics().executionTime());
-		} catch (ParsingFailureException pfe) {
-			print("Failed: " + pfe.getMessage());
-		} catch (CouchbaseException ex) {
-			print("Failed: " + ex.getMessage());
-		}
+    	} else {
+	    	try {
+	    		print("Running Analytics Query: "+query);
+	    		final AnalyticsResult result = cluster.analyticsQuery(query);
+		
+				for (JsonObject row : result.rowsAsObject()) {
+				    print("Found row: " + row);
+				}
+		
+				  print("Reported execution time: " + result.metaData().metrics().executionTime());
+			} catch (Exception e) {
+				print("Failed: " + e.getMessage());
+				if (isDebug) {
+					e.printStackTrace();
+				}
+			} /*catch (ParsingFailureException pfe) {
+				print("Failed: " + pfe.getMessage());
+			} catch (CouchbaseException ex) {
+				print("Failed: " + ex.getMessage());
+			}*/
+    	}
+    	
     	
     }
 
@@ -734,7 +837,13 @@ public class CouchbaseTester
     	createScopes(props);
     	createCollections(props);
     	listCollections(props);
-    	createTenantDocs(props);
+    	int scopeCount = Integer.parseInt(props.getProperty("scope.count","1"));
+    	int collectionCount = Integer.parseInt(props.getProperty("collection.count","1"));
+    	if ((scopeCount==1) && (collectionCount==1)) {
+    		createDocs(props);
+    	} else {
+    		createTenantDocs(props);
+    	}
     }
     
     public void query(Properties props) {
@@ -746,6 +855,7 @@ public class CouchbaseTester
 	        print(result.rowsAsObject().toString());
     	} catch (Exception e) {
 			print("Failed: " + e.getMessage());
+			e.printStackTrace();
 		}
     }
     
