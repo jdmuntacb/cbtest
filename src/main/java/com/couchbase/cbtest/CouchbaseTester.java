@@ -2,7 +2,6 @@ package com.couchbase.cbtest;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -22,6 +21,7 @@ import com.couchbase.client.core.error.BucketNotFoundException;
 import com.couchbase.client.core.error.CollectionExistsException;
 import com.couchbase.client.core.error.CollectionNotFoundException;
 import com.couchbase.client.core.error.CouchbaseException;
+import com.couchbase.client.core.error.DecodingFailureException;
 import com.couchbase.client.core.error.DocumentNotFoundException;
 import com.couchbase.client.core.error.ParsingFailureException;
 import com.couchbase.client.java.Bucket;
@@ -766,6 +766,28 @@ public class CouchbaseTester
        
     }
     
+    private void runQuery(String query, boolean isDebug) {
+		try {
+    		print("Running Query: "+query);
+    		QueryResult result = cluster.query(query);
+    		if (query.contains("VALUE")) {
+    			for (String ro: result.rowsAs(String.class)) {
+    				print(" value: "+ro);
+    			}
+    		} else {
+    			for (JsonObject row : result.rowsAsObject()) {
+				    print("Found row: " + row);
+				}
+    		}
+    		
+		} catch (Exception e) {
+			print("Failed: " + e.getMessage());
+			if (isDebug) {
+				e.printStackTrace();
+			}
+		}
+
+    }
     public void query(Properties props) {
     	//create primary index index1 on default:`db_1`.`project_1`.`tenant_1`;
     	String query = props.getProperty("query","select \"hello\" as greeting");
@@ -779,16 +801,7 @@ public class CouchbaseTester
 					if (query.startsWith("#")) {
 						continue;
 					}
-					try {
-			    		print("Running Query: "+query);
-			    		QueryResult result = cluster.query(query);
-			    		print(result.rowsAsObject().toString());
-					} catch (Exception e) {
-						print("Failed: " + e.getMessage());
-						if (isDebug) {
-							e.printStackTrace();
-						}
-					}
+					runQuery(query,isDebug);
 				}
 		    	
 			} catch (IOException e) {
@@ -798,18 +811,44 @@ public class CouchbaseTester
 				}
 			}
     	} else {
-	    	try {
-	    		print("Running Query: "+query);
-	    		QueryResult result = cluster.query(query);
-		        print(result.rowsAsObject().toString());
-			} catch (Exception e) {
-				print("Failed: " + e.getMessage());
-				if (isDebug) {
-					e.printStackTrace();
-				}
-			}
+    		runQuery(query,isDebug);
     	}
     }
+    
+    private void runAnalyticsQuery(String query, boolean isDebug) {
+    	try {
+    		print("Running Analytics Query: "+query);
+    		final AnalyticsResult result = cluster.analyticsQuery(query);
+    		print("--->");
+    		if (query.contains("VALUE")) {
+    			for (String ro: result.rowsAs(String.class)) {
+    				print(" value: "+ro);
+    			}
+    		} else {
+    			for (JsonObject row : result.rowsAsObject()) {
+				    print("Found row: " + row);
+				}
+    		}
+    		/*for (Object ro : result.rowsAs(Object.class)) {
+				if (ro instanceof JsonObject) {
+					print("JsonObject:"+(JsonObject)ro);
+				} else if (ro instanceof Integer) {
+	    			print("Integer value:"+(Integer)ro);
+	    		} else if (ro instanceof String){
+	    			print("String value:"+(String)ro);
+	    		} else {
+	    			print("Object value:"+ro);
+	    		}
+			}*/
+    		
+			print("Reported execution time: " + result.metaData().metrics().executionTime());
+		} catch (Exception e) {
+			print("Failed: " + e.getMessage());
+			if (isDebug) {
+				e.printStackTrace();
+			}
+		}
+     }
     
     
     public void analytics(Properties props) {
@@ -824,20 +863,8 @@ public class CouchbaseTester
 					if (query.startsWith("#")) {
 						continue;
 					}
-					try {
-			    		print("Running Analytics Query: "+query);
-			    		final AnalyticsResult result = cluster.analyticsQuery(query);
-			    		for (JsonObject row : result.rowsAsObject()) {
-						    print("Found row: " + row);
-						}
-				
-						  print("Reported execution time: " + result.metaData().metrics().executionTime());
-					} catch (Exception e) {
-						print("Failed: " + e.getMessage());
-						if (isDebug) {
-							e.printStackTrace();
-						}
-					}
+					runAnalyticsQuery(query,isDebug);
+					
 				}
 		    	
 			} catch (IOException e) {
@@ -847,23 +874,8 @@ public class CouchbaseTester
 				}
 			}
     	} else {
-	    	try {
-	    		print("Running Analytics Query: "+query);
-	    		final AnalyticsResult result = cluster.analyticsQuery(query);
-		
-				for (JsonObject row : result.rowsAsObject()) {
-				    print("Found row: " + row);
-				}
-		
-				  print("Reported execution time: " + result.metaData().metrics().executionTime());
-			} catch (Exception e) {
-				print("Failed: " + e.getMessage());
-				if (isDebug) {
-					e.printStackTrace();
-				}
-			}
+    		runAnalyticsQuery(query,isDebug);
     	}
-    	
     	
     }
 
