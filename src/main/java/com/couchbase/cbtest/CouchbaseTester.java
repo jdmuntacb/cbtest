@@ -634,7 +634,12 @@ public class CouchbaseTester
         if (docCount==1) {
 	        JsonObject json = null;
 	        if ("_default".contentEquals(docData)) {
-	        	json = JsonObject.create().put("name", System.getProperty("user.name"));
+	        	json = JsonObject.create()
+            			.put("name", System.getProperty("user.name"))
+            			.put("organization", bucket.name())
+            			.put("project",scopeName)
+            			.put("tenant", collectionName)
+            			.put("pid", docId);
 	        } else {
 	        	json = JsonObject.fromJson(docData);
 	        }
@@ -660,7 +665,12 @@ public class CouchbaseTester
 	        for (int docIndex=docStart; docIndex<docCount+docStart; docIndex++) {
 	        	JsonObject json = null;
 	            if ("_default".contentEquals(docData)) {
-	            	json = JsonObject.create().put("name", System.getProperty("user.name")).put("index", docIndex);
+	            	json = JsonObject.create()
+	            			.put("name", System.getProperty("user.name"))
+	            			.put("organization", bucket.name())
+	            			.put("project",scopeName)
+	            			.put("tenant", collectionName)
+	            			.put("pid", docIndex);
 	            } else {
 	            	json = JsonObject.fromJson(docData);
 	            	json.put("index", docIndex);
@@ -727,7 +737,12 @@ public class CouchbaseTester
 		        for (int docIndex=docStart; docIndex<docCount+docStart; docIndex++) {
 		        	JsonObject json = null;
 		            if ("_default".contentEquals(docData)) {
-		            	json = JsonObject.create().put("name", System.getProperty("user.name")).put("index", docIndex);
+		            	json = JsonObject.create()
+		            			.put("name", System.getProperty("user.name"))
+		            			.put("organization", bucket.name())
+		            			.put("project",sName)
+		            			.put("tenant", cName)
+		            			.put("pid", docIndex);
 		            } else {
 		            	json = JsonObject.fromJson(docData);
 		            	json.put("index", docIndex);
@@ -791,25 +806,30 @@ public class CouchbaseTester
     public void query(Properties props) {
     	//create primary index index1 on default:`db_1`.`project_1`.`tenant_1`;
     	String query = props.getProperty("query","select \"hello\" as greeting");
-    	String file = props.getProperty("file",null);
+    	String files = props.getProperty("files",null);
     	boolean isDebug = Boolean.parseBoolean(props.getProperty("isDebug","true"));
-    	if (file!=null) {
-    		print("Running queries from file: "+file);
-    		try {
-				BufferedReader reader = new BufferedReader(new FileReader(new File(file)));
-				while ((query=reader.readLine())!=null) {
-					if (query.startsWith("#")) {
-						continue;
+    	if (files!=null) {
+    		StringTokenizer st = new StringTokenizer(files,",");
+    		while (st.hasMoreTokens()) {
+    			String file = st.nextToken();
+	    		print("Running analytics queries from file: "+file);
+	    		try {
+					BufferedReader reader = new BufferedReader(new FileReader(new File(file)));
+					while ((query=reader.readLine())!=null) {
+						if (query.startsWith("#")||query.strip()=="") {
+							continue;
+						}
+						runQuery(query,isDebug);
+						
 					}
-					runQuery(query,isDebug);
+			    	
+				} catch (IOException e) {
+					print("Failed: " + e.getMessage());
+					if (isDebug) {
+						e.printStackTrace();
+					}
 				}
-		    	
-			} catch (IOException e) {
-				print("Failed: " + e.getMessage());
-				if (isDebug) {
-					e.printStackTrace();
-				}
-			}
+    		}
     	} else {
     		runQuery(query,isDebug);
     	}
@@ -853,26 +873,30 @@ public class CouchbaseTester
     
     public void analytics(Properties props) {
     	String query = props.getProperty("query","select \"hello\" as greeting");
-    	String file = props.getProperty("file",null);
+    	String files = props.getProperty("files",null);
     	boolean isDebug = Boolean.parseBoolean(props.getProperty("isDebug","true"));
-    	if (file!=null) {
-    		print("Running analytics queries from file: "+file);
-    		try {
-				BufferedReader reader = new BufferedReader(new FileReader(new File(file)));
-				while ((query=reader.readLine())!=null) {
-					if (query.startsWith("#")) {
-						continue;
+    	if (files!=null) {
+    		StringTokenizer st = new StringTokenizer(files,",");
+    		while (st.hasMoreTokens()) {
+    			String file = st.nextToken();
+	    		print("Running analytics queries from file: "+file);
+	    		try {
+					BufferedReader reader = new BufferedReader(new FileReader(new File(file)));
+					while ((query=reader.readLine())!=null) {
+						if (query.startsWith("#")||query.strip()=="") {
+							continue;
+						}
+						runAnalyticsQuery(query,isDebug);
+						
 					}
-					runAnalyticsQuery(query,isDebug);
-					
+			    	
+				} catch (IOException e) {
+					print("Failed: " + e.getMessage());
+					if (isDebug) {
+						e.printStackTrace();
+					}
 				}
-		    	
-			} catch (IOException e) {
-				print("Failed: " + e.getMessage());
-				if (isDebug) {
-					e.printStackTrace();
-				}
-			}
+    		}
     	} else {
     		runAnalyticsQuery(query,isDebug);
     	}
