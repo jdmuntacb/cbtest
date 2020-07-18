@@ -6,6 +6,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Date;
 import java.util.Map;
 import java.util.Properties;
@@ -639,7 +640,8 @@ public class CouchbaseTester
             			.put("organization", bucket.name())
             			.put("project",scopeName)
             			.put("tenant", collectionName)
-            			.put("pid", docId);
+            			.put("pid", docId)
+	        			.put("createdon", Instant.now().toString() );
 	        } else {
 	        	json = JsonObject.fromJson(docData);
 	        }
@@ -670,7 +672,8 @@ public class CouchbaseTester
 	            			.put("organization", bucket.name())
 	            			.put("project",scopeName)
 	            			.put("tenant", collectionName)
-	            			.put("pid", docIndex);
+	            			.put("pid", docIndex)
+	            			.put("createdon", Instant.now().toString() );
 	            } else {
 	            	json = JsonObject.fromJson(docData);
 	            	json.put("index", docIndex);
@@ -742,7 +745,8 @@ public class CouchbaseTester
 		            			.put("organization", bucket.name())
 		            			.put("project",sName)
 		            			.put("tenant", cName)
-		            			.put("pid", docIndex);
+		            			.put("pid", docIndex)
+		            			.put("createdon", Instant.now().toString() );
 		            } else {
 		            	json = JsonObject.fromJson(docData);
 		            	json.put("index", docIndex);
@@ -875,6 +879,11 @@ public class CouchbaseTester
     	String query = props.getProperty("query","select \"hello\" as greeting");
     	String files = props.getProperty("files",null);
     	boolean isDebug = Boolean.parseBoolean(props.getProperty("isDebug","true"));
+    	String bucketName = props.getProperty("bucket");
+    	String scopeName = props.getProperty("scope");
+    	String collectionName = props.getProperty("collection");
+    	
+    	
     	if (files!=null) {
     		StringTokenizer st = new StringTokenizer(files,",");
     		while (st.hasMoreTokens()) {
@@ -885,6 +894,15 @@ public class CouchbaseTester
 					while ((query=reader.readLine())!=null) {
 						if (query.startsWith("#")||query.strip()=="") {
 							continue;
+						}
+						if (bucketName!=null) {
+							query = query.replaceAll("MyBucket", bucketName);
+						}
+						if (scopeName!=null) {
+							query = query.replaceAll("MyScope", scopeName);
+						}
+						if (collectionName!=null) {
+							query = query.replaceAll("MyCollection", collectionName);
 						}
 						runAnalyticsQuery(query,isDebug);
 						
@@ -898,10 +916,56 @@ public class CouchbaseTester
 				}
     		}
     	} else {
+    		if (bucketName!=null) {
+				query = query.replaceAll("MyBucket", bucketName);
+			}
+			if (scopeName!=null) {
+				query = query.replaceAll("MyScope", scopeName);
+			}
+			if (collectionName!=null) {
+				query = query.replaceAll("MyCollection", collectionName);
+			}
     		runAnalyticsQuery(query,isDebug);
     	}
     	
     }
+    
+    public void createTenantAnalytics(Properties props) {
+    	String bucketName = props.getProperty("bucket","default");
+    	String scopeName = props.getProperty("scope","_default");
+    	String collectionName = props.getProperty("collection","_default");
+    	int scopeCount = Integer.parseInt(props.getProperty("scope.count","1"));
+    	int scopeStart = Integer.parseInt(props.getProperty("scope.start","1"));
+    	int collectionCount = Integer.parseInt(props.getProperty("collection.count","1"));
+    	int collectionStart = Integer.parseInt(props.getProperty("collection.start","1"));
+    	String operation = props.getProperty("operation","create");
+    	boolean isDebug = Boolean.parseBoolean(props.getProperty("isDebug","true"));
+    	
+    	
+        Bucket bucket = cluster.bucket(bucketName);
+        Collection collection = null;
+        
+        if (collectionCount==1) {
+        	props.setProperty("bucket",bucket.name());
+	        props.setProperty("scope",scopeName);
+	        props.setProperty("collection",collectionName);
+	        analytics(props);
+        } else {
+	        String sName = null, cName = null;
+	        for (int scopeIndex=scopeStart; scopeIndex<scopeCount+scopeStart; scopeIndex++) {
+	        	sName = scopeName +"_"+scopeIndex;
+	        	for (int collectionIndex=collectionStart; collectionIndex<collectionCount+collectionStart; collectionIndex++) {
+			        cName = collectionName + "_"+collectionIndex;
+			        props.setProperty("bucket",bucket.name());
+			        props.setProperty("scope",sName);
+			        props.setProperty("collection",cName);
+			        analytics(props);
+	        	}
+	        }
+        }
+        
+       
+    }   
 
     public void cycle(Properties props) {
     	connectClusterOnly(props);
