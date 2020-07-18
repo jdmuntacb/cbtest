@@ -47,6 +47,8 @@ import com.couchbase.client.java.manager.collection.CollectionSpec;
 import com.couchbase.client.java.manager.collection.ScopeSpec;
 import com.couchbase.client.java.manager.query.CreatePrimaryQueryIndexOptions;
 import com.couchbase.client.java.query.QueryResult;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 
 
@@ -844,7 +846,7 @@ public class CouchbaseTester
     		print("Running Analytics Query: "+query);
     		final AnalyticsResult result = cluster.analyticsQuery(query);
     		print("--->");
-    		if (query.contains("VALUE")) {
+    		/*if (query.contains("VALUE")) {
     			for (String ro: result.rowsAs(String.class)) {
     				print(" value: "+ro);
     			}
@@ -852,7 +854,22 @@ public class CouchbaseTester
     			for (JsonObject row : result.rowsAsObject()) {
 				    print("Found row: " + row);
 				}
-    		}
+    		}*/
+    		
+		   for (JsonNode node : result.rowsAs(JsonNode.class)) {
+			     if (node.isObject()) {
+			       ObjectNode value = (ObjectNode) node;
+			       print("JsonObject:" + value);
+			     } else if (node.isInt()) {
+			       int value = node.intValue();
+			       print("Integer value:" + value);
+			     } else if (node.isTextual()){
+			       String value = node.textValue();
+			       print("String value:" + value);
+			     } else {
+			       print("Node value:" + node);
+			     }
+			}
     		/*for (Object ro : result.rowsAs(Object.class)) {
 				if (ro instanceof JsonObject) {
 					print("JsonObject:"+(JsonObject)ro);
