@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Random;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.logging.Logger;
@@ -49,6 +50,11 @@ import com.couchbase.client.java.manager.query.CreatePrimaryQueryIndexOptions;
 import com.couchbase.client.java.query.QueryResult;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import static com.couchbase.client.java.kv.GetOptions.getOptions;
+import static com.couchbase.client.java.kv.InsertOptions.insertOptions;
+import static com.couchbase.client.java.kv.ReplaceOptions.replaceOptions;
+import static com.couchbase.client.java.kv.UpsertOptions.upsertOptions;
 
 
 
@@ -166,7 +172,7 @@ public class CouchbaseTester
     	int maxTTL = Integer.parseInt(props.getProperty("bucket.maxTTL","0"));
     	boolean replicaIndex = Boolean.parseBoolean(props.getProperty("bucket.replicaindex","true"));
     	String operation = props.getProperty("operation","create");
-    	boolean isCreatePrimaryIndex = Boolean.parseBoolean(props.getProperty("isCreatePrimaryIndex","true"));
+    	boolean isCreatePrimaryIndex = Boolean.parseBoolean(props.getProperty("isCreatePrimaryIndex","false"));
     	
     	BucketManager manager = cluster.buckets();
     	BucketSettings bucketSettings = null;
@@ -369,7 +375,7 @@ public class CouchbaseTester
     	int collectionStart = Integer.parseInt(props.getProperty("collection.start","1"));
     	long secsExp = Long.parseLong(props.getProperty("maxExpiry","-1"));
     	String operation = props.getProperty("operation","create");
-    	boolean isCreatePrimaryIndex = Boolean.parseBoolean(props.getProperty("isCreatePrimaryIndex","true"));
+    	boolean isCreatePrimaryIndex = Boolean.parseBoolean(props.getProperty("isCreatePrimaryIndex","false"));
     	
     	Duration maxExpiry = null;
     	if (secsExp!=-1) {
@@ -621,29 +627,41 @@ public class CouchbaseTester
     	int docCount = Integer.parseInt(props.getProperty("doc.count","1"));
     	int docStart = Integer.parseInt(props.getProperty("doc.start","1"));
     	String operation = props.getProperty("operation","create");
+    	long docExpiry = Long.parseLong(props.getProperty("doc.expiry","0"));
     	
     	
         Bucket bucket = cluster.bucket(bucketName);
         Collection collection = null;
+        String orgName = null;
         
         if (("_default".contentEquals(scopeName)) && ("_default".contentEquals(collectionName))) {
         	collection = bucket.defaultCollection();
+        	orgName = bucket.name();
         } else if ("_default".contentEquals(scopeName)){
         	collection = bucket.defaultScope().collection(collectionName);
+        	orgName = collectionName;
         } else {
         	collection = bucket.scope(scopeName).collection(collectionName);
+        	orgName = scopeName;
         }
 
         if (docCount==1) {
 	        JsonObject json = null;
 	        if ("_default".contentEquals(docData)) {
-	        	json = JsonObject.create()
-            			.put("name", System.getProperty("user.name"))
-            			.put("organization", bucket.name())
-            			.put("project",scopeName)
+	        	
+	        	String [] workRoles = { "Founder", "Co-Founder","CEO","CTO", "President", "Architect", "VP", "SVP", 
+ 	                   "Senior Director", "Director", "Principal Engineer", "Senior Manager", "Manager", 
+ 	                   "Senior Engineer", "Engineer", "HR", "Product Manager", "Senior Product Manager", "Program Manager", "Employee" };
+	        	
+			 	json = JsonObject.create()
+			 			.put("name", System.getProperty("user.name"))
+			 			.put("organization", orgName)
+			 			.put("project",scopeName)
             			.put("tenant", collectionName)
             			.put("pid", docId)
-	        			.put("createdon", Instant.now().toString() );
+			 			.put("role", workRoles[new Random().nextInt(workRoles.length-1)])
+			 			.put("createdon", Instant.now().toString() );
+ 	
 	        } else {
 	        	json = JsonObject.fromJson(docData);
 	        }
@@ -652,7 +670,11 @@ public class CouchbaseTester
             GetResult getResult = null;
             switch (operation) {
 	    		case "create":
-	    			result = collection.upsert( docId, json);
+	    			if (docExpiry==0) {
+	    				result = collection.upsert( docId, json);
+	    			} else {
+	    				result = collection.upsert( docId, json, upsertOptions().expiry(Duration.ofSeconds(docExpiry)));
+	    			}
 		            getResult = collection.get(docId);
 		            print(getResult.toString());
 		            break;
@@ -660,22 +682,31 @@ public class CouchbaseTester
 	    			result = collection.remove(docId);
 	    			break;
 	    		default:
-	    			result = collection.upsert( docId, json);
+	    			if (docExpiry==0) {
+	    				result = collection.upsert( docId, json);
+	    			} else {
+	    				result = collection.upsert( docId, json, upsertOptions().expiry(Duration.ofSeconds(docExpiry)));
+	    			}
 		            getResult = collection.get(docId);
 		            print(getResult.toString());
     		}
         } else {
 	        String docKey = null;
+	        int globalIndex = 1;
 	        for (int docIndex=docStart; docIndex<docCount+docStart; docIndex++) {
 	        	JsonObject json = null;
 	            if ("_default".contentEquals(docData)) {
+	            	String [] workRoles = { "CEO","CTO", "President", "Architect", "VP", "SVP", 
+	  	                   "Senior Director", "Director", "Principal Engineer", "Senior Manager", "Manager", 
+	  	                   "Senior Engineer", "Engineer", "HR", "Product Manager", "Senior Product Manager", "Program Manager" };
 	            	json = JsonObject.create()
-	            			.put("name", System.getProperty("user.name"))
-	            			.put("organization", bucket.name())
+	            			.put("name", System.getProperty("user.name") + "_" +(globalIndex++))
+	            			.put("organization", orgName)
 	            			.put("project",scopeName)
 	            			.put("tenant", collectionName)
 	            			.put("pid", docIndex)
-	            			.put("createdon", Instant.now().toString() );
+	            			.put("role", workRoles[new Random().nextInt(workRoles.length-1)])
+				 			.put("createdon", Instant.now().toString() );
 	            } else {
 	            	json = JsonObject.fromJson(docData);
 	            	json.put("index", docIndex);
@@ -687,7 +718,13 @@ public class CouchbaseTester
 	            switch (operation) {
 		    		case "create":
 		    			try {
-		    				result = collection.upsert( docKey, json);
+		    				//result = collection.upsert( docKey, json);
+		    				if (docExpiry==0) {
+			    				result = collection.upsert( docKey, json);
+			    			} else {
+			    				result = collection.upsert( docKey, json, upsertOptions().expiry(Duration.ofSeconds(docExpiry)));
+			    			}
+		    				
 		    			} catch (com.couchbase.client.core.error.AmbiguousTimeoutException ate) {
 		    				print("Retrying due to ..."+ate.getMessage());
 		    				result = collection.upsert( docKey, json);
@@ -704,7 +741,11 @@ public class CouchbaseTester
 		    			}
 		    			break;
 		    		default:
-		    			result = collection.upsert( docKey, json);
+		    			if (docExpiry==0) {
+		    				result = collection.upsert( docKey, json);
+		    			} else {
+		    				result = collection.upsert( docKey, json, upsertOptions().expiry(Duration.ofSeconds(docExpiry)));
+		    			}
 			            getResult = collection.get(docKey);
 			            print(getResult.toString());
 	    		}
@@ -734,20 +775,42 @@ public class CouchbaseTester
         
         
         String sName = null, cName = null;
+        int globalIndex = 1;
         for (int scopeIndex=scopeStart; scopeIndex<scopeCount+scopeStart; scopeIndex++) {
-        	sName = scopeName +"_"+scopeIndex;
+        	if ("_default".contentEquals(scopeName)) {
+        		sName = scopeName;
+        	} else {
+        		if (scopeCount==1) {
+        			sName = scopeName;
+        		} else {
+        			sName = scopeName +"_"+scopeIndex;
+        		}
+        	}
         	for (int collectionIndex=collectionStart; collectionIndex<collectionCount+collectionStart; collectionIndex++) {
-		        cName = collectionName + "_"+collectionIndex;
+        		if ("_default".contentEquals(collectionName)) {
+        			cName = collectionName;
+        		} else {
+        			if (collectionCount==1) {
+        				cName = collectionName;
+        			} else {
+        				cName = collectionName + "_"+collectionIndex;
+        			}
+        		}
         		String docKey = null;
 		        for (int docIndex=docStart; docIndex<docCount+docStart; docIndex++) {
 		        	JsonObject json = null;
 		            if ("_default".contentEquals(docData)) {
+		            	String [] workRoles = { "CEO","CTO", "President", "Architect", "VP", "SVP", 
+		            	                   "Senior Director", "Director", "Principal Engineer", "Senior Manager", "Manager", 
+		            	                   "Senior Engineer", "Engineer", "HR", "Product Manager", "Senior Product Manager", "Program Manager" };
+		            	
 		            	json = JsonObject.create()
-		            			.put("name", System.getProperty("user.name"))
+		            			.put("name", System.getProperty("user.name")+"_"+ (globalIndex++))
 		            			.put("organization", bucket.name())
 		            			.put("project",sName)
 		            			.put("tenant", cName)
 		            			.put("pid", docIndex)
+		            			.put("role", workRoles[new Random().nextInt(workRoles.length-1)])
 		            			.put("createdon", Instant.now().toString() );
 		            } else {
 		            	json = JsonObject.fromJson(docData);
@@ -818,7 +881,7 @@ public class CouchbaseTester
     		StringTokenizer st = new StringTokenizer(files,",");
     		while (st.hasMoreTokens()) {
     			String file = st.nextToken();
-	    		print("Running analytics queries from file: "+file);
+	    		print("Running queries from file: "+file);
 	    		try {
 					BufferedReader reader = new BufferedReader(new FileReader(new File(file)));
 					while ((query=reader.readLine())!=null) {
@@ -839,6 +902,95 @@ public class CouchbaseTester
     	} else {
     		runQuery(query,isDebug);
     	}
+    }
+    
+    public void dropAnalyticsDatasets(Properties props) {
+    	boolean isDebug = Boolean.parseBoolean(props.getProperty("isDebug","true"));
+    	String dataSetName = props.getProperty("dataset");
+    	
+    	String query = "SELECT VALUE d.DataverseName || '.' || d.DatasetName FROM Metadata.`Dataset` d WHERE d.DataverseName <> \"Metadata\"";
+    	try {
+    		print("Droping data sets - Running Analytics Query: "+query);
+    		final AnalyticsResult result = cluster.analyticsQuery(query);
+    		print("--->");
+    		
+    		if (dataSetName!=null) {
+			       print("Droping DataSet:" + dataSetName);
+			       String query2 = "DROP DATASET "+dataSetName;
+			       AnalyticsResult result2 = cluster.analyticsQuery(query2);
+		    } else {
+			    for (JsonNode node : result.rowsAs(JsonNode.class)) {
+				     if (node.isObject()) {
+				       ObjectNode value = (ObjectNode) node;
+				       print("JsonObject:" + value);
+				     } else if (node.isInt()) {
+				       int value = node.intValue();
+				       print("Integer value:" + value);
+				     } else if (node.isTextual()){
+				       String value = node.textValue();
+				       if (value!=null) {
+					       print("Droping DataSet:" + value);
+					       String query2 = "DROP DATASET "+value;
+					       AnalyticsResult result2 = cluster.analyticsQuery(query2);
+				       }
+				       
+				     } else {
+				       print("Node value:" + node);
+				     }
+				}
+		    }
+    		
+			print("Reported execution time: " + result.metaData().metrics().executionTime());
+		} catch (Exception e) {
+			print("Failed: " + e.getMessage());
+			if (isDebug) {
+				e.printStackTrace();
+			}
+		}
+    }
+    public void dropAnalyticsDataverses(Properties props) {
+    	boolean isDebug = Boolean.parseBoolean(props.getProperty("isDebug","true"));
+    	String dataverseName = props.getProperty("dataverse");
+    	
+    	String query = "SELECT VALUE d.DataverseName FROM Metadata.`Dataverse` d WHERE d.DataverseName <> \"Metadata\" AND d.DataverseName <> \"Default\"";
+    	try {
+    		print("Droping dataverses - Running Analytics Query: "+query);
+    		final AnalyticsResult result = cluster.analyticsQuery(query);
+    		print("--->");
+    		
+    		if (dataverseName!=null) {
+			       print("Droping Dataverse:" + dataverseName);
+			       String query2 = "DROP DATAVERSE "+dataverseName;
+			       AnalyticsResult result2 = cluster.analyticsQuery(query2);
+		    } else {
+			   for (JsonNode node : result.rowsAs(JsonNode.class)) {
+				     if (node.isObject()) {
+				       ObjectNode value = (ObjectNode) node;
+				       print("JsonObject:" + value);
+				     } else if (node.isInt()) {
+				       int value = node.intValue();
+				       print("Integer value:" + value);
+				     } else if (node.isTextual()){
+				       String value = node.textValue();
+				       if (value!=null) {
+					       print("Dropping Dataverse:" + value);
+					       String query2 = "DROP DATAVERSE "+value;
+					       AnalyticsResult result2 = cluster.analyticsQuery(query2);
+				       }
+				       
+				     } else {
+				       print("Node value:" + node);
+				     }
+				}
+		    }
+    		
+			print("Reported execution time: " + result.metaData().metrics().executionTime());
+		} catch (Exception e) {
+			print("Failed: " + e.getMessage());
+			if (isDebug) {
+				e.printStackTrace();
+			}
+		}
     }
     
     private void runAnalyticsQuery(String query, boolean isDebug) {
@@ -899,7 +1051,20 @@ public class CouchbaseTester
     	String bucketName = props.getProperty("bucket");
     	String scopeName = props.getProperty("scope");
     	String collectionName = props.getProperty("collection");
+    	String tokenBucketName = props.getProperty("bucket.token.name", "MyBucket");
+    	String tokenScopeName = props.getProperty("scope.token.name", "MyScope");
+    	String tokenCollectionName = props.getProperty("collection.token.name", "MyCollection");
+    	String dataverseName = props.getProperty("dataverse");
+    	String tokenDataverseName = props.getProperty("dataverse.token.name", "MyDataverse");
+    	String newCollectionName = props.getProperty("newcollection");
+    	String tokenNewCollectionName = props.getProperty("newcollection.token.name", "MyNewCollection");
     	
+    	String operation = props.getProperty("operation", "run");
+    	if (operation.contentEquals("dropall")) {
+    		dropAnalyticsDatasets(props);
+    		dropAnalyticsDataverses(props);
+    		return;
+    	}
     	
     	if (files!=null) {
     		StringTokenizer st = new StringTokenizer(files,",");
@@ -913,13 +1078,19 @@ public class CouchbaseTester
 							continue;
 						}
 						if (bucketName!=null) {
-							query = query.replaceAll("MyBucket", bucketName);
+							query = query.replaceAll(tokenBucketName, bucketName);
 						}
 						if (scopeName!=null) {
-							query = query.replaceAll("MyScope", scopeName);
+							query = query.replaceAll(tokenScopeName, scopeName);
 						}
 						if (collectionName!=null) {
-							query = query.replaceAll("MyCollection", collectionName);
+							query = query.replaceAll(tokenCollectionName, collectionName);
+						}
+						if (dataverseName!=null) {
+							query = query.replaceAll(tokenDataverseName, dataverseName);
+						}
+						if (newCollectionName!=null) {
+							query = query.replaceAll(tokenNewCollectionName, newCollectionName);
 						}
 						runAnalyticsQuery(query,isDebug);
 						
@@ -934,13 +1105,19 @@ public class CouchbaseTester
     		}
     	} else {
     		if (bucketName!=null) {
-				query = query.replaceAll("MyBucket", bucketName);
+				query = query.replaceAll(tokenBucketName, bucketName);
 			}
 			if (scopeName!=null) {
-				query = query.replaceAll("MyScope", scopeName);
+				query = query.replaceAll(tokenScopeName, scopeName);
 			}
 			if (collectionName!=null) {
-				query = query.replaceAll("MyCollection", collectionName);
+				query = query.replaceAll(tokenCollectionName, collectionName);
+			}
+			if (dataverseName!=null) {
+				query = query.replaceAll(tokenDataverseName, dataverseName);
+			}
+			if (newCollectionName!=null) {
+				query = query.replaceAll(tokenNewCollectionName, newCollectionName);
 			}
     		runAnalyticsQuery(query,isDebug);
     	}
@@ -951,6 +1128,7 @@ public class CouchbaseTester
     	String bucketName = props.getProperty("bucket","default");
     	String scopeName = props.getProperty("scope","_default");
     	String collectionName = props.getProperty("collection","_default");
+    	String dataverseName = props.getProperty("dataverse", "Default");
     	int scopeCount = Integer.parseInt(props.getProperty("scope.count","1"));
     	int scopeStart = Integer.parseInt(props.getProperty("scope.start","1"));
     	int collectionCount = Integer.parseInt(props.getProperty("collection.count","1"));
@@ -961,6 +1139,7 @@ public class CouchbaseTester
     	
         Bucket bucket = cluster.bucket(bucketName);
         Collection collection = null;
+        int totalCollectionCount = 1;
         
         if (collectionCount==1) {
         	props.setProperty("bucket",bucket.name());
@@ -970,13 +1149,24 @@ public class CouchbaseTester
         } else {
 	        String sName = null, cName = null;
 	        for (int scopeIndex=scopeStart; scopeIndex<scopeCount+scopeStart; scopeIndex++) {
-	        	sName = scopeName +"_"+scopeIndex;
+	        	if (scopeCount==1) {
+	        		sName = scopeName;
+	        	} else {
+	        		sName = scopeName +"_"+scopeIndex;
+	        	}
 	        	for (int collectionIndex=collectionStart; collectionIndex<collectionCount+collectionStart; collectionIndex++) {
-			        cName = collectionName + "_"+collectionIndex;
+	        		if (collectionCount==1) {
+	        			cName = collectionName;
+	        		} else {
+	        			cName = collectionName + "_"+collectionIndex;
+	        		}
 			        props.setProperty("bucket",bucket.name());
 			        props.setProperty("scope",sName);
 			        props.setProperty("collection",cName);
+			        props.setProperty("newcollection", collectionName + "_" + (totalCollectionCount));
+			        props.setProperty("dataverse", dataverseName + "_" + totalCollectionCount);
 			        analytics(props);
+			        totalCollectionCount++;
 	        	}
 	        }
         }
