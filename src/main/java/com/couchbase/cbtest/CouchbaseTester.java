@@ -19,6 +19,7 @@ import com.couchbase.client.core.deps.io.netty.handler.ssl.util.InsecureTrustMan
 import com.couchbase.client.core.diagnostics.PingResult;
 import com.couchbase.client.core.env.IoConfig;
 import com.couchbase.client.core.env.SecurityConfig;
+import com.couchbase.client.core.error.BucketExistsException;
 import com.couchbase.client.core.error.BucketNotFoundException;
 import com.couchbase.client.core.error.CollectionExistsException;
 import com.couchbase.client.core.error.CollectionNotFoundException;
@@ -189,7 +190,11 @@ public class CouchbaseTester
 	   			    	.replicaIndexes(replicaIndex)
 	   			    	.conflictResolutionType(ConflictResolutionType.TIMESTAMP)
 	   			    	.ejectionPolicy(EjectionPolicy.FULL);
-	     	    	manager.createBucket(bucketSettings);
+	       		 	try {
+	       		 		manager.createBucket(bucketSettings);
+	       		 	} catch (BucketExistsException bee) {
+	       		 		print("Bucket already exists!");
+	       		 	}
 	     	    	if (isCreatePrimaryIndex) {
 	    				props.setProperty("query", "CREATE PRIMARY INDEX ON `"+bucketName+"`" );
 	    				query(props);
@@ -218,7 +223,11 @@ public class CouchbaseTester
    			    	.replicaIndexes(replicaIndex)
    			    	.conflictResolutionType(ConflictResolutionType.TIMESTAMP)
    			    	.ejectionPolicy(EjectionPolicy.FULL);
-	    			manager.createBucket(bucketSettings);
+	    			try {
+	       		 		manager.createBucket(bucketSettings);
+	       		 	} catch (BucketExistsException bee) {
+	       		 		print("Bucket already exists!");
+	       		 	}
 	    			if (isCreatePrimaryIndex) {
 	    				props.setProperty("query", "CREATE PRIMARY INDEX ON `"+bucketName+"`" );
 	    				query(props);
@@ -894,7 +903,26 @@ public class CouchbaseTester
 							queryParts=reader.readLine();
 							query+= "\n"+ queryParts;
 						}
-						runQuery(query,isDebug);
+						
+						if (query.toUpperCase().contains("CREATE TABLE") || query.toUpperCase().contains("CREATE BUCKET") || query.toUpperCase().contains("CREATE DATABASE")) {
+							String bucketName = new StringTokenizer(query.substring(query.indexOf("CREATE TABLE")+13)).nextToken();
+							Properties p = new Properties();
+							p.put("bucket", bucketName);
+							p.put("operation", "create");
+							createBuckets(p);
+							
+						} else {
+							int index = query.indexOf(";");
+							int fromIndex = 0;
+							String squery = null;
+							while (index!=-1) {
+								squery = query.substring(fromIndex,index+1);
+								runQuery(squery,isDebug);
+								fromIndex = index+1;
+								index = query.indexOf(";", fromIndex);
+							}
+							
+						}
 						
 					}
 			    	
