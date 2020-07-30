@@ -884,9 +884,15 @@ public class CouchbaseTester
 	    		print("Running queries from file: "+file);
 	    		try {
 					BufferedReader reader = new BufferedReader(new FileReader(new File(file)));
+					String queryParts = null;
 					while ((query=reader.readLine())!=null) {
-						if (query.startsWith("#")||query.strip()=="") {
+						if (query.startsWith("--")||query.startsWith("/*")||query.startsWith("#")||query.strip()=="") {
 							continue;
+						}
+						queryParts = query;
+						while (queryParts!=null && !queryParts.endsWith(";")) {
+							queryParts=reader.readLine();
+							query+= "\n"+ queryParts;
 						}
 						runQuery(query,isDebug);
 						
@@ -1073,10 +1079,21 @@ public class CouchbaseTester
 	    		print("Running analytics queries from file: "+file);
 	    		try {
 					BufferedReader reader = new BufferedReader(new FileReader(new File(file)));
+					
+					
+					String queryParts = null;
+					
 					while ((query=reader.readLine())!=null) {
-						if (query.startsWith("#")||query.strip()=="") {
+						if (query.startsWith("--")||query.startsWith("/*")||query.startsWith("#")||query.strip()=="") {
 							continue;
 						}
+						
+						queryParts = query;
+						while (queryParts!=null && !queryParts.endsWith(";")) {
+							queryParts=reader.readLine();
+							query+= "\n"+ queryParts;
+						}
+							
 						if (bucketName!=null) {
 							query = query.replaceAll(tokenBucketName, bucketName);
 						}
