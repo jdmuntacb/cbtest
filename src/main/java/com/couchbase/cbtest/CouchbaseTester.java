@@ -4,10 +4,19 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
@@ -92,10 +101,17 @@ public class CouchbaseTester
     				ClassLoader classLoader = cbtest.getClass().getClassLoader();
     				Object newObject = classLoader.loadClass(clsName).getDeclaredConstructor()
                             .newInstance();
-    				Method method = newObject.getClass().getMethod(methodName, Properties.class);
-    		        method.setAccessible(true);
-    		        method.invoke(newObject,settings);
-    			} else {
+    				if ("help".equalsIgnoreCase(methodName)) {
+    					printServiceHelp(newObject);
+    				} else {
+	    				Method method = newObject.getClass().getMethod(methodName, Properties.class);
+	    		        method.setAccessible(true);
+	    		        method.invoke(newObject,settings);
+    				}
+    			} else if ("help".equalsIgnoreCase(action)) {
+    				printServiceHelp(cbtest);
+					
+				} else {
 	    			Method method = cbtest.getClass().getMethod(action, Properties.class);
 			        method.setAccessible(true);
 			        method.invoke(cbtest,settings);
@@ -106,6 +122,47 @@ public class CouchbaseTester
     	}
     }
     
+    private static void printServiceHelp(Object obj) {
+    	Method [] methods = obj.getClass().getDeclaredMethods();
+		List<String> methodNames = new ArrayList<String>();
+		for (Method method: methods) {
+			if (Modifier.isPublic(method.getModifiers())) {
+	    	    ServiceDef serviceDef = method.getAnnotation(ServiceDef.class);
+	    	    if (serviceDef != null) {
+	    	      String[] params = serviceDef.params();
+	    	      StringBuilder sb = new StringBuilder();
+	    	      for (String p: params) {
+	    	    	 sb.append(p +" ");
+	    	      }
+	    	      String descOfMethod = serviceDef.description();
+	    	      methodNames.add(method.getName() +" --> " + descOfMethod + " ("+sb.toString()+")");
+	    	    } else {
+	    	    	if (!method.getName().contains("main")) {
+	    	    		methodNames.add(method.getName());
+	    	    	}
+	    	    }
+	    	  }
+			
+		}
+		Collections.sort(methodNames);
+		for (int i=0;i<methodNames.size(); i++) {
+			System.out.println("  "+ (i+1)+"."+ methodNames.get(i));
+		}
+    	
+    }
+    
+    private static void printHelp(Object obj) {
+    	Method [] methods = obj.getClass().getDeclaredMethods();
+		List<String> methodNames = new ArrayList<String>();
+		for (Method m: methods) {
+			methodNames.add(m.getName());
+		}
+		Collections.sort(methodNames);
+		for (String name: methodNames) {
+			System.out.println(name);
+		}
+    }
+    
     public CouchbaseTester() {
     	this.settings = System.getProperties();
     }
@@ -114,6 +171,8 @@ public class CouchbaseTester
     	this.settings = props;
     }
     
+    @ServiceDef(description = "Connects to the CB cluster and opens to the bucket and gets the default collection",
+            params = {"props - Properties, Ex: -Drun=connectCluster -Durl=localhost -Duser=Administrator -Dpassword=password -Dbucket=default -Ddbaas=false"}) 
     public Cluster connectCluster(Properties props) {
     	String url = props.getProperty("url", "localhost");
     	String user = props.getProperty("user","Administrator");
@@ -138,7 +197,8 @@ public class CouchbaseTester
 		return cluster;
     	
     }
-    
+    @ServiceDef(description = "Connects to the CB cluster only without bucket open",
+            params = {"props - Properties, Ex: -Drun=connectCluster -Durl=localhost -Duser=Administrator -Dpassword=password -Dbucket=default -Ddbaas=false"}) 
     public Cluster connectClusterOnly(Properties props) {
     	String url = props.getProperty("url", "localhost");
     	String user = props.getProperty("user","Administrator");
@@ -161,7 +221,9 @@ public class CouchbaseTester
     	
     }
        
-    
+    @ServiceDef(description = "Create/Drop/Drop-all buckets on already connected cluster",
+            params = {"props - Properties, Ex: -Drun=createBuckets -Dbucket=default -Dbucket.count=1 -Dbucket.start=1 -Dbucket.type=couchbase "
+            		+ "-Dbucket.quota=100 -Dbucket.replicas=1 -Dbucket.maxTTL=0 -Doperation=create -DisCreatePrimaryIndex=false"}) 
     public void createBuckets(Properties props) {
     	boolean status = true;
     	int bucketCount = Integer.parseInt(props.getProperty("bucket.count","1"));
@@ -298,6 +360,8 @@ public class CouchbaseTester
     	
     }
     
+    @ServiceDef(description = "Opens a bucket on already connected cluster",
+            params = {"props - Properties, Ex: -Drun=openBucket -Dbucket=default"}) 
     public void openBucket(Properties props) {
     	String bucketName = props.getProperty("bucket","default");
     	bucket = cluster.bucket(bucketName);
@@ -306,12 +370,15 @@ public class CouchbaseTester
 		Collection collection = bucket.defaultCollection();
     }
     
+    @ServiceDef(description = "Creates primary index on already connected cluster and opened bucket",
+            params = {"props - Properties, Ex: -Drun=createPrimaryIndex -Dbucket=default"}) 
     public void createPrimaryIndex(Properties props) {
     	String bucketName = props.getProperty("bucket","default");
 		cluster.queryIndexes().createPrimaryIndex(bucketName, CreatePrimaryQueryIndexOptions.createPrimaryQueryIndexOptions().ignoreIfExists(true));
     }
     
-
+    @ServiceDef(description = "Create/Drop scopes on already connected cluster",
+            params = {"props - Properties, Ex: -Drun=createScopes -Dbucket=default -Dscope=_default -Dscope.count=1 -Dscope.start=1 -Doperation=create|drop|dropall"}) 
     public void createScopes(Properties props) {
     	boolean status = true;
        	String bucketName = props.getProperty("bucket","default");
@@ -373,6 +440,9 @@ public class CouchbaseTester
     	
     }
 
+    @ServiceDef(description = "Create/Drop/Dropall collections on already connected cluster and opened bucket",
+            params = {"props - Properties, Ex: -Drun=createCollections -Dbucket=default -Dscope=_default -Dcollection=_default -Dscope.count=1 -Dscope.start=1 "
+            		+ "-Dcollection.count=1 -Dcollection.start=1 -DmaxExpiry=-1 -DisCreatePrimaryIndex=false -Doperation=create|drop|dropall "})     
     public void createCollections(Properties props) {
     	boolean status = true;
        	String bucketName = props.getProperty("bucket","default");
@@ -572,6 +642,8 @@ public class CouchbaseTester
     	print("Done");
     }
     
+    @ServiceDef(description = "List collections on already connected cluster",
+            params = {"props - Properties, Ex: -Drun=listCollections -Dbucket=default -Dscope=_default "})     
     public void listCollections(Properties props) {
     	String bucketName = props.getProperty("bucket","default");
     	String scopeName = props.getProperty("scope","_default");
@@ -611,6 +683,8 @@ public class CouchbaseTester
         
     }
     
+    @ServiceDef(description = "Count collections on already connected cluster",
+            params = {"props - Properties, Ex: -Drun=countCollections -Dbucket=default -Dscope=_default "})  
     public void countCollections(Properties props) {
     	String bucketName = props.getProperty("bucket","default");
     	String scopeName = props.getProperty("scope","_default");
@@ -627,6 +701,9 @@ public class CouchbaseTester
         
     }
     
+    @ServiceDef(description = "Create documents on already connected cluster",
+            params = {"props - Properties, Ex: -Drun=createDocs -Dbucket=default -Dscope=_default -Dcollection=_default -Ddoc.id=my_document "
+            		+ "-Ddoc=_default|customdoc -Ddoc.count=1 -Ddoc.start=1 -Ddoc.expiry=0 -Doperation=create|drop"})  
     public void createDocs(Properties props) {
     	String bucketName = props.getProperty("bucket","default");
     	String scopeName = props.getProperty("scope","_default");
@@ -764,6 +841,10 @@ public class CouchbaseTester
        
     }
     
+    @ServiceDef(description = "Create documents on all collections in already connected cluster",
+            params = {"props - Properties, Ex: -Drun=createTenantDocs -Dbucket=default -Dscope=_default -Dcollection=_default "
+            		+ "-Dscope.count=1 -Dscope.start=1 -Dcollection.count=1 -Dcollection.start=1 -Ddoc.id=my_document " 
+            		+ "-Ddoc=_default|customdoc -Ddoc.count=1 -Ddoc.start=1 -Ddoc.expiry=0 -Doperation=create|drop"}) 
     public void createTenantDocs(Properties props) {
     	String bucketName = props.getProperty("bucket","default");
     	String scopeName = props.getProperty("scope","_default");
@@ -859,6 +940,7 @@ public class CouchbaseTester
        
     }
     
+    
     private void runQuery(String query, boolean isDebug) {
 		try {
     		print("Running Query: "+query);
@@ -881,6 +963,9 @@ public class CouchbaseTester
 		}
 
     }
+    
+    @ServiceDef(description = "Runs N1QL queries from given string or from a set of files on already connected cluster",
+            params = {"props - Properties, Ex: -Drun=query -Dquery=<query-string> -Dfiles=<comma-separated-file-names> -DisDebug=true"})
     public void query(Properties props) {
     	//create primary index index1 on default:`db_1`.`project_1`.`tenant_1`;
     	String query = props.getProperty("query","select \"hello\" as greeting");
@@ -938,6 +1023,8 @@ public class CouchbaseTester
     	}
     }
     
+    @ServiceDef(description = "Drop given or all analytics datasets on already connected cluster",
+            params = {"props - Properties, Ex: -Drun=dropAnalyticsDatasets -Ddataset=<name> -DisDebug=true"})
     public void dropAnalyticsDatasets(Properties props) {
     	boolean isDebug = Boolean.parseBoolean(props.getProperty("isDebug","true"));
     	String dataSetName = props.getProperty("dataset");
@@ -982,6 +1069,9 @@ public class CouchbaseTester
 			}
 		}
     }
+    
+    @ServiceDef(description = "Drop given or all analytics dataverses on already connected cluster",
+            params = {"props - Properties, Ex: -Drun=dropAnalyticsDataverses -Ddataverse=<name> -DisDebug=true"})
     public void dropAnalyticsDataverses(Properties props) {
     	boolean isDebug = Boolean.parseBoolean(props.getProperty("isDebug","true"));
     	String dataverseName = props.getProperty("dataverse");
@@ -1077,7 +1167,10 @@ public class CouchbaseTester
 		}
      }
     
-    
+    @ServiceDef(description = "Run Analytics queries from given string or from a set of files on already connected cluster against all collections",
+            params = {"props - Properties, Ex: -Drun=analytics -Dquery=<name> -Dfiles=<comma-separated-filenames> -Dbucket= -Dscope= -Dcollection= "
+            		+ "-Dbucket.token.name=MyBucket -Dscope.token.name=MyScope -Dcollection.token.name=MyCollection -Ddataverse= -Ddataverse.tocken.name=MyDataverse "
+            		+ "-Dnewcollection -Dnewcollection.token.name=MyNewCollection -DisDebug=true"})
     public void analytics(Properties props) {
     	String query = props.getProperty("query","select \"hello\" as greeting");
     	String files = props.getProperty("files",null);
@@ -1168,7 +1261,9 @@ public class CouchbaseTester
     	}
     	
     }
-    
+    @ServiceDef(description = "Create analytics datasets on already connected cluster for all collections/scopes",
+            params = {"props - Properties, Ex: -Drun=createTenantAnalytics -Dbucket=default -Dscope=_default -Dcollection=_default -Ddataverse=Default "
+            		+ "-Dscope.count=1 -Dscope.start=1 -Dcollection.count=1 -Dcollection.start=1 -Doperation=create|drop -DisDebug=true"})
     public void createTenantAnalytics(Properties props) {
     	String bucketName = props.getProperty("bucket","default");
     	String scopeName = props.getProperty("scope","_default");
@@ -1219,6 +1314,8 @@ public class CouchbaseTester
        
     }   
 
+    @ServiceDef(description = "This is a wrapper to include connectclusterOnly,createBuckets,delay,openBucket,createScopes,createCollections,listCollections",
+            params = {"props - Properties","Ex: -Dbucket=[default]"}) 
     public void cycle(Properties props) {
     	connectClusterOnly(props);
     	createBuckets(props);
@@ -1236,12 +1333,15 @@ public class CouchbaseTester
     	}
     }
     
-    
+    @ServiceDef(description = "Pings already connected cluster",
+            params = {"props - Properties, Ex: See the openBucket service"})
     public void pingCluster(Properties props) {
     	PingResult ping = cluster.ping();
 		print(ping.toString());
     }
     
+    @ServiceDef(description = "Adds simple sleep for given number of secs",
+            params = {"props - Properties, Ex: -Ddelay=10"})
     public void delay(Properties props) {
     	long seconds = Long.parseLong(props.getProperty("delay","10"));
     	try {
@@ -1252,7 +1352,21 @@ public class CouchbaseTester
 		}
     }
     
-    public static void print(String s) {
+    private static void print(String s) {
     	System.out.println(new Date() +" "+s);
+    }
+    
+    // Documentation annotations : https://stackoverflow.com/questions/15312238/how-to-get-a-javadoc-of-a-method-at-run-time
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(value = ElementType.METHOD)
+    public @interface ServiceDef {
+      /**
+       * This provides description when generating docs.
+       */
+      public String description() default "";
+      /**
+       * This provides params when generating docs.
+       */
+      public String[] params();
     }
 }
