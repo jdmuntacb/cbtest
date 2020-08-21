@@ -52,6 +52,7 @@ import com.couchbase.client.java.manager.bucket.BucketType;
 import com.couchbase.client.java.manager.bucket.CompressionMode;
 import com.couchbase.client.java.manager.bucket.ConflictResolutionType;
 import com.couchbase.client.java.manager.bucket.EjectionPolicy;
+import com.couchbase.client.java.manager.bucket.GetBucketOptions;
 import com.couchbase.client.java.manager.collection.AsyncCollectionManager;
 import com.couchbase.client.java.manager.collection.CollectionManager;
 import com.couchbase.client.java.manager.collection.CollectionSpec;
@@ -248,28 +249,30 @@ public class CouchbaseTester
     		
     		switch (operation) {
 	    		case "create":
-	       		 	bucketSettings = BucketSettings.create(bucketName)
-	   	    			.bucketType(BucketType.valueOf(bucketType.toUpperCase()))
-	   	    			.ramQuotaMB(ramQuotaMB)
-	   			    	.numReplicas(numReplicas)
-	   			    	.maxTTL(maxTTL)
-	   			    	.replicaIndexes(replicaIndex)
-	   			    	.conflictResolutionType(ConflictResolutionType.valueOf(conflictResolutionType.toUpperCase()))
-	   			    	.flushEnabled(flushEnabled)
-	   			    	.compressionMode(CompressionMode.valueOf(compressionMode.toUpperCase()))
-	   			    	.ejectionPolicy(EjectionPolicy.valueOf(ejectionPolicy.toUpperCase()));
-	       		 	try {
-	       		 		manager.createBucket(bucketSettings);
-	       		 	} catch (BucketExistsException bee) {
-	       		 		print("Bucket already exists!");
-	       		 	}
-	     	    	if (isCreatePrimaryIndex) {
-	    				props.setProperty("query", "CREATE PRIMARY INDEX ON `"+bucketName+"`" );
-	    				query(props);
+	    			StringTokenizer st = new StringTokenizer(bucketName,",");
+	    			while (st.hasMoreTokens()) {
+	    				String bucketName1 = st.nextToken();
+	    				print("Creating bucket: "+bucketName1);
+		       		 	bucketSettings = setupBucketSettings(bucketName1, props);
+	    			
+		       		 	try {
+		       		 		manager.createBucket(bucketSettings);
+		       		 	} catch (BucketExistsException bee) {
+		       		 		print("Bucket "+bucketName1+" already exists!");
+		       		 	}
+		     	    	if (isCreatePrimaryIndex) {
+		    				props.setProperty("query", "CREATE PRIMARY INDEX ON `"+bucketName1+"`" );
+		    				query(props);
+		    			}
 	    			}
 	    			break;
-	    		case "drop":	
-	    			manager.dropBucket(bucketName);
+	    		case "drop":
+	    			StringTokenizer st1 = new StringTokenizer(bucketName,",");
+	    			while (st1.hasMoreTokens()) {
+	    				String bucketName1 = st1.nextToken();
+	    				print("Droping bucket: "+bucketName1);
+	    				manager.dropBucket(bucketName1);
+	    			}
 	    			break;
 	    		case "dropall":
 	    			Map<String, BucketSettings> buckets = manager.getAllBuckets();
@@ -283,14 +286,7 @@ public class CouchbaseTester
 	        	    break;    
 	    			
 	    		default:
-	    			bucketSettings = BucketSettings.create(bucketName)
-   	    			.bucketType(BucketType.COUCHBASE)
-   	    			.ramQuotaMB(ramQuotaMB)
-   			    	.numReplicas(numReplicas)
-   			    	.maxTTL(maxTTL)
-   			    	.replicaIndexes(replicaIndex)
-   			    	.conflictResolutionType(ConflictResolutionType.TIMESTAMP)
-   			    	.ejectionPolicy(EjectionPolicy.FULL);
+	    			bucketSettings = setupBucketSettings(bucketName, props);
 	    			try {
 	       		 		manager.createBucket(bucketSettings);
 	       		 	} catch (BucketExistsException bee) {
@@ -310,60 +306,73 @@ public class CouchbaseTester
     	} else {
 	    	print(operation+" buckets "+ bucketName + "_xxx, count="+bucketCount);
 	    	String bName = null;
-	    	for (int bucketIndex=1; bucketIndex<=bucketCount+bucketStart; bucketIndex++) {
-	    		bName = bucketName+"_"+bucketIndex;
-	    		switch (operation) {
-		    		case "create":
-		    			 bucketSettings = BucketSettings.create(bName)
-			    			.bucketType(BucketType.COUCHBASE)
-			    			.ramQuotaMB(ramQuotaMB)
-					    	.numReplicas(numReplicas)
-					    	.maxTTL(maxTTL)
-					    	.replicaIndexes(replicaIndex)
-					    	.conflictResolutionType(ConflictResolutionType.TIMESTAMP)
-					    	.ejectionPolicy(EjectionPolicy.FULL);
-		    			 manager.createBucket(bucketSettings);
-		    			 if (isCreatePrimaryIndex) {
-			    				props.setProperty("query", "CREATE PRIMARY INDEX ON `"+bucketName+"`" );
+	    	for (int bucketIndex=bucketStart; bucketIndex<bucketCount+bucketStart; bucketIndex++) {
+	    		StringTokenizer st = new StringTokenizer(bucketName, ",");
+	    		while (st.hasMoreTokens()) {
+    				String bucketName1 = st.nextToken();
+    				bName = bucketName1+"_"+bucketIndex;
+		    		switch (operation) {
+			    		case "create":
+			    			bucketSettings = setupBucketSettings(bName, props);
+			    			 manager.createBucket(bucketSettings);
+			    			 if (isCreatePrimaryIndex) {
+				    				props.setProperty("query", "CREATE PRIMARY INDEX ON `"+bucketName+"`" );
+				    				query(props);
+				    		 }
+			    			break;
+			    		case "drop":
+			    			
+			    			manager.dropBucket(bName);
+			    			break;
+			    		case "dropall":
+			    			Map<String, BucketSettings> buckets = manager.getAllBuckets();
+			    			int totalBuckets = buckets.size();
+			    			Set<String> bucketNames = buckets.keySet();
+			    			for (String bKey: bucketNames) {
+			    				print("Droping..."+buckets.get(bKey).toString());
+			    				BucketSettings b = (BucketSettings)buckets.get(bKey);
+			    				manager.dropBucket(b.name());
+			    			}
+			        	    return;    
+			    			
+			    		default:
+			    			bucketSettings = setupBucketSettings(bName, props);
+			    			manager.createBucket(bucketSettings);
+			    			if (isCreatePrimaryIndex) {
+			    				props.setProperty("query", "CREATE PRIMARY INDEX ON `"+bName+"`" );
 			    				query(props);
-			    		 }
-		    			break;
-		    		case "drop":
-		    			
-		    			manager.dropBucket(bName);
-		    			break;
-		    		case "dropall":
-		    			Map<String, BucketSettings> buckets = manager.getAllBuckets();
-		    			int totalBuckets = buckets.size();
-		    			Set<String> bucketNames = buckets.keySet();
-		    			for (String bKey: bucketNames) {
-		    				print("Droping..."+buckets.get(bKey).toString());
-		    				BucketSettings b = (BucketSettings)buckets.get(bKey);
-		    				manager.dropBucket(b.name());
-		    			}
-		        	    return;    
-		    			
-		    		default:
-		    			bucketSettings = BucketSettings.create(bName)
-	   	    			.bucketType(BucketType.COUCHBASE)
-	   	    			.ramQuotaMB(ramQuotaMB)
-	   			    	.numReplicas(numReplicas)
-	   			    	.maxTTL(maxTTL)
-	   			    	.replicaIndexes(replicaIndex)
-	   			    	.conflictResolutionType(ConflictResolutionType.TIMESTAMP)
-	   			    	.ejectionPolicy(EjectionPolicy.FULL);
-		    			manager.createBucket(bucketSettings);
-		    			if (isCreatePrimaryIndex) {
-		    				props.setProperty("query", "CREATE PRIMARY INDEX ON `"+bucketName+"`" );
-		    				query(props);
-		    			}
-		    			break;
-		    			
-				}
+			    			}
+			    			break;
+			    			
+					}
+	    		}
 	    			 		    	
 	    	}
     	}
     	
+    }
+    
+    private BucketSettings setupBucketSettings(String bName, Properties props) {
+    	String bucketType = props.getProperty("bucket.type","COUCHBASE");
+    	long ramQuotaMB = Long.parseLong(props.getProperty("bucket.quota","100"));
+    	int numReplicas = Integer.parseInt(props.getProperty("bucket.replicas","1"));
+    	int maxTTL = Integer.parseInt(props.getProperty("bucket.maxTTL","0"));
+    	boolean replicaIndex = Boolean.parseBoolean(props.getProperty("bucket.replicaindex","true"));
+    	boolean flushEnabled = Boolean.parseBoolean(props.getProperty("bucket.flushenabled","true"));
+    	String compressionMode = props.getProperty("bucket.compressionmode","PASSIVE");
+    	String conflictResolutionType = props.getProperty("bucket.conflictresolutiontype","TIMESTAMP");
+    	String ejectionPolicy = props.getProperty("bucket.ejectionpolicy","FULL");
+    	
+    	return BucketSettings.create(bName)
+    		.bucketType(BucketType.valueOf(bucketType.toUpperCase()))
+			.ramQuotaMB(ramQuotaMB)
+	    	.numReplicas(numReplicas)
+	    	.maxTTL(maxTTL)
+	    	.replicaIndexes(replicaIndex)
+	    	.conflictResolutionType(ConflictResolutionType.valueOf(conflictResolutionType.toUpperCase()))
+	    	.flushEnabled(flushEnabled)
+	    	.compressionMode(CompressionMode.valueOf(compressionMode.toUpperCase()))
+	    	.ejectionPolicy(EjectionPolicy.valueOf(ejectionPolicy.toUpperCase()));
     }
     
     @ServiceDef(description = "Opens a bucket on already connected cluster",
