@@ -229,11 +229,15 @@ public class CouchbaseTester
     	int bucketCount = Integer.parseInt(props.getProperty("bucket.count","1"));
     	int bucketStart = Integer.parseInt(props.getProperty("bucket.start","1"));
     	String bucketName = props.getProperty("bucket","default");
-    	String bucketType = props.getProperty("bucket.type","couchbase");
+    	String bucketType = props.getProperty("bucket.type","COUCHBASE");
     	long ramQuotaMB = Long.parseLong(props.getProperty("bucket.quota","100"));
     	int numReplicas = Integer.parseInt(props.getProperty("bucket.replicas","1"));
     	int maxTTL = Integer.parseInt(props.getProperty("bucket.maxTTL","0"));
     	boolean replicaIndex = Boolean.parseBoolean(props.getProperty("bucket.replicaindex","true"));
+    	boolean flushEnabled = Boolean.parseBoolean(props.getProperty("bucket.flushenabled","true"));
+    	String compressionMode = props.getProperty("bucket.compressionmode","PASSIVE");
+    	String conflictResolutionType = props.getProperty("bucket.conflictresolutiontype","TIMESTAMP");
+    	String ejectionPolicy = props.getProperty("bucket.ejectionpolicy","FULL");
     	String operation = props.getProperty("operation","create");
     	boolean isCreatePrimaryIndex = Boolean.parseBoolean(props.getProperty("isCreatePrimaryIndex","false"));
     	
@@ -245,13 +249,15 @@ public class CouchbaseTester
     		switch (operation) {
 	    		case "create":
 	       		 	bucketSettings = BucketSettings.create(bucketName)
-	   	    			.bucketType(BucketType.COUCHBASE)
+	   	    			.bucketType(BucketType.valueOf(bucketType.toUpperCase()))
 	   	    			.ramQuotaMB(ramQuotaMB)
 	   			    	.numReplicas(numReplicas)
 	   			    	.maxTTL(maxTTL)
 	   			    	.replicaIndexes(replicaIndex)
-	   			    	.conflictResolutionType(ConflictResolutionType.TIMESTAMP)
-	   			    	.ejectionPolicy(EjectionPolicy.FULL);
+	   			    	.conflictResolutionType(ConflictResolutionType.valueOf(conflictResolutionType.toUpperCase()))
+	   			    	.flushEnabled(flushEnabled)
+	   			    	.compressionMode(CompressionMode.valueOf(compressionMode.toUpperCase()))
+	   			    	.ejectionPolicy(EjectionPolicy.valueOf(ejectionPolicy.toUpperCase()));
 	       		 	try {
 	       		 		manager.createBucket(bucketSettings);
 	       		 	} catch (BucketExistsException bee) {
